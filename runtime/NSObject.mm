@@ -785,24 +785,27 @@ class AutoreleasePoolPage
         // Not recursive: we don't want to blow out the stack 
         // if a thread accumulates a stupendous amount of garbage
         
+        //如果当前指针的next不是stop
         while (this->next != stop) {
             // Restart from hotPage() every time, in case -release 
             // autoreleased more objects
             AutoreleasePoolPage *page = hotPage();
 
             // fixme I think this `while` can be `if`, but I can't prove it
+            
+            //当池子是空的，就不用释放，把它变成hotpage
             while (page->empty()) {
                 page = page->parent;
                 setHotPage(page);
             }
 
             page->unprotect();
-            id obj = *--page->next;
-            memset((void*)page->next, SCRIBBLE, sizeof(*page->next));
+            id obj = *--page->next; //取出page里面的对象
+            memset((void*)page->next, SCRIBBLE, sizeof(*page->next));// 将page指针置空
             page->protect();
 
             if (obj != POOL_BOUNDARY) {
-                objc_release(obj);
+                objc_release(obj); // release
             }
         }
 
@@ -1060,6 +1063,7 @@ public:
         AutoreleasePoolPage *page;
         id *stop;
 
+        //判断是否是空池子
         if (token == (void*)EMPTY_POOL_PLACEHOLDER) {
             // Popping the top-level placeholder pool.
             if (hotPage()) {
@@ -1073,9 +1077,9 @@ public:
             return;
         }
 
-        page = pageForPointer(token);
+        page = pageForPointer(token); //根据token拿到page指针
         stop = (id *)token;
-        if (*stop != POOL_BOUNDARY) {
+        if (*stop != POOL_BOUNDARY) { //如果没有到边界
             if (stop == page->begin()  &&  !page->parent) {
                 // Start of coldest page may correctly not be POOL_BOUNDARY:
                 // 1. top-level pool is popped, leaving the cold page in place
@@ -1087,9 +1091,9 @@ public:
             }
         }
 
-        if (PrintPoolHiwat) printHiwat();
+        if (PrintPoolHiwat) printHiwat(); //这一句应该是打日志，加水印什么的
 
-        page->releaseUntil(stop);
+        page->releaseUntil(stop); //这一句看上去像真正的释放了
 
         // memory: delete empty children
         if (DebugPoolAllocation  &&  page->empty()) {
